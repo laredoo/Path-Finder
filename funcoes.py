@@ -57,11 +57,12 @@ def is_terminal_state(environment, rewards, current_row_index, current_column_in
   
 #define an epsilon greedy algorithm that will choose which action to take next (i.e., where to move next)
 def get_next_action(q_values, current_row_index, current_column_index, epsilon):
-  #if a randomly chosen value between 0 and 1 is less than epsilon, 
-  #then choose the most promising value from the Q-table for this state.
+  # if a randomly chosen value between 0 and 1 is less than epsilon, 
+  # then choose the most promising value from the Q-table for this state.
   if np.random.random() < epsilon:
     return np.argmax(q_values[current_row_index, current_column_index])
   else: #choose a random action
+    # print('epsilon greedy in action')
     return np.random.randint(4)
   
 #define a function that will get the next location based on the chosen action
@@ -71,6 +72,7 @@ def get_next_location(environment, current_row_index, current_column_index, acti
   # se slide_factor < 80% nao escorrega
   # caso contrario, sorteamos as outras opcoes
   slide_factor = np.random.random()
+  # slide_factor = 0.79
   actions = ['up', 'right', 'down', 'left']
   new_row_index = current_row_index
   new_column_index = current_column_index
@@ -80,60 +82,146 @@ def get_next_location(environment, current_row_index, current_column_index, acti
         new_row_index -= 1
     else:
        if np.random.randint(2) == 0:
+          # print('Escorreguei para a direita')
           new_column_index += 1 # escorrego para direita
-       new_column_index -= 1 # escorrego para esquerda
+       else:
+          # print('Escorreguei para a esquerda') 
+          new_column_index -= 1 # escorrego para esquerda
 
   elif actions[action_index] == 'right' and current_column_index < columns - 1:
     if slide_factor < 0.8:    
         new_column_index += 1
     else:
        if np.random.randint(2) == 0:
+          # print('Escorreguei para cima')
           new_row_index -= 1 # escorrego para cima
-       new_row_index += 1 # escorrego para baixo
+       else:
+          # print('Escorreguei para baixo')   
+          new_row_index += 1 # escorrego para baixo
 
   elif actions[action_index] == 'down' and current_row_index < rows - 1:
     if slide_factor < 0.8:
         new_row_index += 1
     else:
        if np.random.randint(2) == 0:
+          # print('Escorreguei para a direita')
           new_column_index += 1 # escorrego para direita
-       new_column_index -= 1 # escorrego para esquerda
+       else:
+          # print('Escorreguei para a esquerda')    
+          new_column_index -= 1 # escorrego para esquerda
 
   elif actions[action_index] == 'left' and current_column_index > 0:
     if slide_factor < 0.8:
         new_column_index -= 1
     else:
        if np.random.randint(2) == 0:
+          # print('Escorreguei para cima') 
           new_row_index -= 1 # escorrego para cima
-       new_row_index += 1 # escorrego para baixo
+       else:  
+          # print('Escorreguei para baixo')    
+          new_row_index += 1 # escorrego para baixo
 
   return new_row_index, new_column_index
 
+def translate_action(action_index):
+   if action_index == 0:
+      return 'c'
+   elif action_index == 1:
+      return 'd'
+   elif action_index == 2:
+      return 'b'
+   elif action_index == 3:
+      return 'e'
+
+def get_best_actions(environment, rewards, rows, columns, q_values):
+   best_actions= np.zeros((rows, columns), dtype = 'U1')
+   for i in range(rows):
+      for j in range(columns):
+         action_index = get_next_action(q_values, i, j, 1.)
+         best_actions[i][j] = translate_action(action_index)
+         if is_terminal_state(environment, rewards, i, j):
+            best_actions[i][j] = 'n'
+   return best_actions
+
+"""
 #Define a function that will get the shortest path between any location within the warehouse that 
 #the robot is allowed to travel and the item packaging location.
-def get_shortest_path(environment, rewards, start_row_index, start_column_index):
+def get_shortest_path(environment, rewards, q_values, epsilon, start_row_index, start_column_index):
   rows, columns = environment.shape
-  #return immediately if this is an invalid starting location
+  # return immediately if this is an invalid starting location
   if is_terminal_state(environment, rewards, start_row_index, start_column_index):
     return []
-  else: #if this is a 'legal' starting location
-    current_row_index, current_column_index = start_row_index, start_column_index
+  else:
+    current_row_index, current_column_index = start_row_index, start_column_index   
     shortest_path = []
     shortest_path.append([current_row_index, current_column_index])
-    #continue moving along the path until we reach the goal (i.e., the item packaging location)
-    while not is_terminal_state(environment, rewards, current_row_index, current_column_index):
-      #get the best action to take
-      action_index = get_next_action(environment, current_row_index, current_column_index, 1)
-      
-      #move to the next location on the path, and add the new location to the list
-      current_row_index, current_column_index = get_next_location(environment, current_row_index, current_column_index, action_index)
-      
-      # proibindo posicoes fora da matriz
-      if current_row_index < 0 or current_row_index >= rows or current_column_index < 0 or current_column_index >= columns:
-        break
-      
-      shortest_path.append([current_row_index, current_column_index])
+    # continue moving along the path until we reach the goal (i.e., the item packaging location)
+    while not max(q_values[current_row_index, current_column_index]) == 1.:
+       # get the best action to take
+       action_index = get_next_action(q_values, current_row_index, current_column_index, 1-epsilon)
+       # move to the next location on the path, and add the new location to the list
+       current_row_index, current_column_index = get_next_location(environment, current_row_index, current_column_index, action_index)
+       shortest_path.append([current_row_index, current_column_index])
+       if is_terminal_state(environment, rewards, current_row_index, current_column_index) and not max(q_values[current_row_index, current_column_index]) == 1.:
+          print('Escorreguei e atingi um não terminal. O caminho percorrido foi\n', shortest_path, '\n')
+          shortest_path = []
+          current_row_index, current_column_index = start_row_index, start_column_index
+          shortest_path.append([current_row_index, current_column_index])
+    print('O menor caminho percorrido pelo agente foi:\n')
     return shortest_path
+"""
+def update_agent_position(environment, old_row_index, old_column_index, current_row_index, current_column_index
+                          , start_row_index, start_column_index):
+   new_env = environment.copy()
+   new_env[current_row_index, current_column_index] = 10
+   new_env[old_row_index, old_column_index] = 0
+   if((current_row_index, current_column_index) != (start_row_index,start_column_index)):
+      # print('entrei aqui')
+      new_env[start_row_index, start_column_index] = 0
+   return new_env
+   
+#Define a function that will get the shortest path between any location within the warehouse that 
+#the robot is allowed to travel and the item packaging location.
+def get_shortest_path(environment, rewards, q_values, epsilon, start_row_index, start_column_index):
+  # essa lista vai conter todas as matrizes de posicao do meu agente
+  data_list = []
+  data_list.append(environment)
+  print(data_list[0])
+  # return immediately if this is an invalid starting location
+  if is_terminal_state(environment, rewards, start_row_index, start_column_index):
+    return []
+  else:
+    current_row_index, current_column_index = start_row_index, start_column_index   
+    shortest_path = []
+    shortest_path.append([current_row_index, current_column_index])
+    # continue moving along the path until we reach the goal (i.e., the item packaging location)
+    while not max(q_values[current_row_index, current_column_index]) == 1.:
+       # get the best action to take
+       action_index = get_next_action(q_values, current_row_index, current_column_index, 1-epsilon)
+       print('---------------------------------------------------\n',
+             'Action Index ---->', action_index, '\n')
+       # move to the next location on the path, and add the new location to the list
+       old_row_index, old_column_index = current_row_index, current_column_index
+       current_row_index, current_column_index = get_next_location(environment, current_row_index, current_column_index, action_index)
+       print('row, column ---->', current_row_index, current_column_index, '\n')
+       new_environment = update_agent_position(environment, old_row_index, old_column_index, current_row_index, current_column_index,
+                                              start_row_index, start_column_index)
+       print(
+          'NOVO MAPA\n',
+          new_environment
+       )
+       data_list.append(new_environment)
+       shortest_path.append([current_row_index, current_column_index])
+       if is_terminal_state(environment, rewards, current_row_index, current_column_index) and not max(q_values[current_row_index, current_column_index]) == 1.:
+          print('Escorreguei e atingi um não terminal. O caminho percorrido foi\n', shortest_path, '\n')
+          data_list.append(environment)
+          new_environment = environment
+          # print(environment)
+          shortest_path = []
+          current_row_index, current_column_index = start_row_index, start_column_index
+          shortest_path.append([current_row_index, current_column_index])
+    print('O menor caminho percorrido pelo agente foi:\n')
+    return shortest_path, data_list
 
 def printData(i, alpha, gamma, r, epsilon, d, matrix):
     print("Número de iterações:", i)
