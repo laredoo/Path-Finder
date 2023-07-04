@@ -49,22 +49,16 @@ iterations, learning_rate, discount_factor, reward_value, epsilon, dimensions, m
 rows, columns = matrix.shape
 
 # inicializar o ambiente
-q_values = f.startEnvironment(matrix)
+# q_values = f.startEnvironmentZeros(matrix) # Função Utilizada para Inicializar o Ambiente com Valores Nulos
+q_values = f.startEnvironmentRandom(matrix)
 
 # inicializar as recompensas e a posicao de inicio
 rewards, start_position = f.setRewards(matrix, reward_value)
 start_row_index, start_column_index = start_position
-# print(rewards)
-# print('start_position -------> ', start_position)
-
-# print(q_values)
 
 # definir as acoes
 # 0 = up, 1 = right, 2 = down, 3 = left
 actions = ['up', 'right', 'down', 'left']
-
-# print(q_values)
-# print(rewards)
 
 # Imprimir os valores lidos
 f.printData(iterations, learning_rate, discount_factor, 
@@ -75,13 +69,11 @@ for episode in range(iterations):
     # posicao de inicio
     row_index, column_index = start_position
 
-    # continue taking actions (i.e., moving) until we reach a terminal state
-    # (i.e., until we reach the +1 or -1 area or crash into a wall)
     while not f.is_terminal_state(matrix, rewards, row_index, column_index):
-        # choose which action to take (i.e., where to move next)
+        # Escolha qual a proxima ação a tomar
         action_index = f.get_next_action(q_values, row_index, column_index, epsilon)
 
-        # perform the chosen action, and transition to the next state (i.e., move to the next location)
+        # Faça a ação escolhida e transicione para o próximo estado
         old_row_index, old_column_index = row_index, column_index # store the old row and column indexes
         aux_row, aux_column = f.get_next_location(matrix, row_index, column_index, action_index)
         # row_index, column_index = f.get_next_location(matrix, row_index, column_index, action_index)
@@ -92,27 +84,27 @@ for episode in range(iterations):
 
         row_index, column_index = aux_row, aux_column
 
-        # receive the reward for moving to the new state, and calculate the temporal difference
+        # Receba a recompensa pela transição para o novo estado e calcule a temporal difference
         reward = rewards[row_index, column_index]
         old_q_value = q_values[old_row_index, old_column_index, action_index]
         temporal_difference = reward + (discount_factor * np.max(q_values[row_index, column_index])) - old_q_value
 
-        # update the Q-value for the previous state and action pair
+        # Atualize o Q-value para o estado passado e o par de ação
         new_q_value = old_q_value + (learning_rate * temporal_difference) # Bellman Equation
         q_values[old_row_index, old_column_index, action_index] = new_q_value
 
 print('Training complete!')
-best_actions = f.get_best_actions(matrix, rewards, rows, columns, q_values)
-# print(q_values)
-# print(best_actions)
-
-# print(q_values)
-# print(q_values[2, 0])
-# print(np.argmax(q_values[2, 0]))
-# print('Start_row_index, Start_Columns_Index ----->', start_row_index, start_column_index)
-shortest_path, data_list = f.get_shortest_path(matrix, rewards, q_values, epsilon, start_row_index, start_column_index)
+# best_actions = f.get_best_actions(matrix, rewards, rows, columns, q_values)
+maior_qvalue  = np.max(q_values, axis=2)
+best_actions = f.get_best_actions(maior_qvalue , rewards, rows, columns, q_values)
+shortest_path, data_list, final_reward = f.get_shortest_path(matrix, rewards, q_values, epsilon, start_row_index, start_column_index)
 print(shortest_path)
+# print('A recompensa final obtida ao longo de todo o caminho (contando o estado terminal final, em que a recompensa é +1) é igual à:', final_reward)
 print('\nLembrando que o agente pode deslizar no meio do caminho!')
+
+sns.heatmap(maior_qvalue , cbar = True, square= True, annot = best_actions, fmt='', vmin=np.min(maior_qvalue), vmax=np.max(maior_qvalue))
+# sns.heatmap(matrix, cbar = False, square= True, annot = best_actions, fmt='')
+plt.savefig(output_file+'.png')
 
 fig = plt.figure()
 
@@ -124,20 +116,7 @@ def animate(i):
     data = data_list[i]
     sns.heatmap(data, square = True, cbar = False)
 
-# aqui está minha lista que contém todas as minhas matrizes de posições.
-# data_list = []
-
 anim = animation.FuncAnimation(fig, animate, init_func = init(rows), frames = len(data_list), repeat = False)
 pillowwriter = animation.PillowWriter(fps = 7)
 
-anim.save('outgif.gif', writer=pillowwriter)
-
-sns.heatmap(matrix, cbar = False, square= True, annot = best_actions, fmt='')
-plt.savefig(output_file)
-
-
-""" 
-
-    The intuitions on the way of correcting mistakes are on correcting the function 'get_next_location'.
-    It's accepting invalid locations, that are invalidating the algorithm's work
-"""
+anim.save(output_file+'.gif', writer=pillowwriter)

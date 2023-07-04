@@ -1,11 +1,6 @@
 import numpy as np
 
-def startEnvironment(environment):
-    #Create a 3D numpy array to hold the current Q-values for each state and action pair: Q(s, a) 
-    #The array contains n rows and n columns (to match the shape of the environment), as well as a third "action" dimension.
-    #The "action" dimension consists of 4 layers that will allow us to keep track of the Q-values for each possible action in
-    #each state (see next cell for a description of possible actions). 
-    #The value of each (state, action) pair is initialized to 0.
+def startEnvironmentZeros(environment):
     rows, columns = environment.shape
     q_values = np.zeros((rows, columns, 4))
     # agora, setamos a recompensa como +1, -1 e 0 nos terminais.
@@ -14,7 +9,24 @@ def startEnvironment(environment):
         for j in range(environment.shape[1]):
             value = environment[i, j]
             if value == -1:
-                q_values[i,j] = 0
+                q_values[i,j] = -1
+            elif value == 7:
+                q_values[i,j] = 1 
+            elif value == 4:
+                q_values[i,j] = -1
+    
+    return q_values
+
+def startEnvironmentRandom(environment):
+    rows, columns = environment.shape
+    q_values = np.random.rand(rows, columns, 4)
+    # agora, setamos a recompensa como +1, -1 e 0 nos terminais.
+    # Iterar sobre a matriz
+    for i in range(environment.shape[0]):
+        for j in range(environment.shape[1]):
+            value = environment[i, j]
+            if value == -1:
+                q_values[i,j] = -1
             elif value == 7:
                 q_values[i,j] = 1 
             elif value == 4:
@@ -25,7 +37,6 @@ def startEnvironment(environment):
 def setRewards(environment, reward_value):
     rows, columns = environment.shape
     rewards = np.full((rows, columns), reward_value) # crio um np.array 2x2 para as recompensas
-
     # agora, setamos a recompensa como +1, -1 e 0 nos terminais.
     # Iterar sobre a matriz
     for i in range(environment.shape[0]):
@@ -56,17 +67,17 @@ def is_terminal_state(environment, rewards, current_row_index, current_column_in
     else:
         return False
   
-#define an epsilon greedy algorithm that will choose which action to take next (i.e., where to move next)
+# Defina um algoritmo epsilon greedy que irá escolher a próxima ação
 def get_next_action(q_values, current_row_index, current_column_index, epsilon):
-  # if a randomly chosen value between 0 and 1 is less than epsilon, 
-  # then choose the most promising value from the Q-table for this state.
+  # Se um valor aleatoriamente escolhido entre 0 e 1 é menor que epsilon,
+  # escolha o valor mais promissor da Q-Table para esse estado.
   if np.random.random() < epsilon:
     return np.argmax(q_values[current_row_index, current_column_index])
-  else: #choose a random action
+  else: # Escolha uma ação aleatória
     # print('epsilon greedy in action')
     return np.random.randint(4)
   
-#define a function that will get the next location based on the chosen action
+# Defina uma função que vai retornar o próximo estado baseado na ação escolhida
 def get_next_location(environment, current_row_index, current_column_index, action_index):
   rows, columns = environment.shape
   # sorteamos um valor aleatorio entre 0 e 1
@@ -159,11 +170,12 @@ def update_agent_position(environment, old_row_index, old_column_index, current_
       new_env[start_row_index, start_column_index] = 0
    return new_env
    
-#Define a function that will get the shortest path between any location within the warehouse that 
-#the robot is allowed to travel and the item packaging location.
+# Defina uma função que vai pegar o menor caminho entre qualquer localização de início e a saída,
+# considerando as posições que o robô pode caminhar.
 def get_shortest_path(environment, rewards, q_values, epsilon, start_row_index, start_column_index):
   rows, columns = environment.shape
   current_environment = environment.copy()
+  reward = 0
   # essa lista vai conter todas as matrizes de posicao do meu agente
   data_list = []
   data_list.append(current_environment) # posição de início
@@ -191,6 +203,8 @@ def get_shortest_path(environment, rewards, q_values, epsilon, start_row_index, 
                new_environment = current_environment.copy()
                data_list.append(new_environment)
                current_row_index, current_column_index = old_row_index, old_column_index
+               reward += rewards[current_row_index, current_column_index]
+               # print('nova recompensa\n', reward)
             # Caiu na posição -1
             elif(rewards[current_row_index, current_column_index] == -1.):
                # Coloco o agente nessa posição
@@ -205,6 +219,8 @@ def get_shortest_path(environment, rewards, q_values, epsilon, start_row_index, 
                data_list.append(environment)
                shortest_path = []
                shortest_path.append([current_row_index, current_column_index])
+               reward = 0
+               # print('resetei a recompensa, cai no terminal incorreto\n', reward)
             # Chego no resultado
             elif(rewards[current_row_index, current_column_index] == 1.):
                # Coloco a agente na nova posição
@@ -213,6 +229,8 @@ def get_shortest_path(environment, rewards, q_values, epsilon, start_row_index, 
                new_environment[current_row_index,current_column_index] = 10
                data_list.append(new_environment)
                shortest_path.append([current_row_index, current_column_index])
+               reward += rewards[current_row_index, current_column_index]
+               # print('recompensa final\n', reward)
                # Acaba o meu laço
                break
          # Fora do mapa
@@ -230,8 +248,10 @@ def get_shortest_path(environment, rewards, q_values, epsilon, start_row_index, 
          data_list.append(new_environment)
          current_environment = new_environment
          shortest_path.append([current_row_index, current_column_index])
+         reward += rewards[current_row_index, current_column_index]
+         # print('nova recompensa\n', reward)
     print('O menor caminho percorrido pelo agente foi:\n')
-    return shortest_path, data_list
+    return shortest_path, data_list, reward
 
 def printData(i, alpha, gamma, r, epsilon, d, matrix):
     print("Número de iterações:", i)
